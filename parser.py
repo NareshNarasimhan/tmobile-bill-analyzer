@@ -126,10 +126,26 @@ def compute_summary(parsed):
     return pd.DataFrame(final_rows)
 
 def generate_qr(df):
-    text = "T-Mobile Summary\n" + "\n".join(
-        [f"{r.phone} ({r.type}): ${r.cost}" for r in df.itertuples()]
-    )
-    qr = qrcode.QRCode(version=1, box_size=8, border=4)
+    """Generate QR text grouped by line type, with per-type totals."""
+    # Sort/group by Type
+    grouped = df.sort_values(by=["type", "phone"])
+    grouped_lines = []
+    grouped_lines.append("T-Mobile Bill Summary\n")  
+
+    for t, sub in grouped.groupby("type"):
+        grouped_lines.append(f"{t} Lines:")
+        for _, r in sub.iterrows():
+            safe_line = r["phone"]
+            # safe_line = re.sub(r'\D', '', safe_line)
+            safe_line = safe_line.replace("(", "").replace(")", "").replace(" ", "-")  # non-breaking hyphen
+            safe_line = safe_line.replace(" ", "")  # tidy up spaces
+            safe_line = f"x{safe_line}"  # add prefix to avoid number-first parsing
+            grouped_lines.append(f"  {safe_line}: ${r['cost']}")
+        grouped_lines.append("")  # blank line between types
+
+    text = "\n".join(grouped_lines).strip()
+
+    qr = qrcode.QRCode(version=2, box_size=8, border=4, error_correction=qrcode.constants.ERROR_CORRECT_Q)
     qr.add_data(text)
     qr.make(fit=True)
     img = qr.make_image(fill="black", back_color="white")
